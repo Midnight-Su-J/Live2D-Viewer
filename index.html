@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Live2D 动画查看器</title>
+    <!-- 项目自定义样式（按模块拆分，与 spine viewer 保持一致的视觉风格） -->
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/controls.css">
+    <link rel="stylesheet" href="css/panels.css">
+    <link rel="stylesheet" href="css/capture.css">
+    <link rel="stylesheet" href="css/background.css">
+</head>
+<body>
+    <!-- 主画布容器：PixiJS 将 canvas 注入此容器，bgLayer 存放背景图 -->
+    <div id="container">
+        <div id="bgLayer">
+            <img id="bgImage" alt="">
+        </div>
+    </div>
+
+    <!-- B 键背景操控模式提示 -->
+    <div class="bg-mode-indicator" id="bgModeIndicator">背景操控模式（长按 B）</div>
+
+    <!-- 加载中遮罩 / 错误提示 -->
+    <div class="loading" id="loading">加载 Live2D 资源中…</div>
+    <div class="error-tip" id="errorTip"></div>
+
+    <!-- 面板遮罩层（点击关闭面板） -->
+    <div class="panel-overlay hidden" id="panelOverlay"></div>
+
+    <!-- 左上角操作提示 -->
+    <div class="top-left" id="hint">
+        左键拖拽：移动人物 &nbsp;|&nbsp; 滚轮：缩放 &nbsp;|&nbsp; 双击：重置视图 &nbsp;|&nbsp; H：显示/隐藏控件<br>
+        长按 B：拖拽移动背景图 / 滚轮缩放背景图
+    </div>
+
+    <!-- 右上角功能按钮 -->
+    <div class="top-right">
+        <button id="openFileBtn" title="选择本地 Live2D 模型文件夹">打开文件夹</button>
+        <button id="bgBtn" title="背景设置">背景</button>
+        <button id="captureBtn" title="拍摄 / 录制">拍摄</button>
+        <button id="fsBtn" title="全屏">全屏</button>
+    </div>
+
+    <!-- 文件选择面板（选择 Live2D 模型文件夹） -->
+    <div class="file-panel hidden" id="filePanel">
+        <h3>加载本地 Live2D 模型</h3>
+        <div class="file-row">
+            <label>模型文件夹（包含 .model.json 或 .model3.json）</label>
+            <div class="file-input-row">
+                <input type="file" id="folderInput" webkitdirectory multiple>
+                <button type="button" class="file-clear-btn" id="clearFolderBtn" title="清除">✕</button>
+            </div>
+            <span class="file-name" id="folderName"></span>
+            <div class="bg-hint" style="margin-top:6px;">
+                选择包含模型定义文件（.model.json / .model3.json）及其 moc、贴图、动作、表情等资源的整个文件夹。<br>
+                支持 Cubism 2（.moc）与 Cubism 4（.moc3）模型。
+            </div>
+        </div>
+        <div class="file-actions">
+            <button class="btn-cancel" id="cancelFileBtn">取消</button>
+            <button class="btn-load" id="loadFileBtn">加载</button>
+        </div>
+    </div>
+
+    <!-- 背景设置面板 -->
+    <div class="bg-panel hidden" id="bgPanel">
+        <h3>背景设置</h3>
+        <div class="bg-section">
+            <label>纯色背景</label>
+            <div class="hsl-row">
+                <span class="hsl-label">色相</span>
+                <input type="range" id="hueSlider" min="0" max="360" step="1" value="0">
+                <span class="hsl-val" id="hueVal">0°</span>
+            </div>
+            <div class="hsl-row">
+                <span class="hsl-label">饱和度</span>
+                <input type="range" id="satSlider" min="0" max="100" step="1" value="0">
+                <span class="hsl-val" id="satVal">0%</span>
+            </div>
+            <div class="hsl-row">
+                <span class="hsl-label">明度</span>
+                <input type="range" id="lightSlider" min="0" max="100" step="1" value="0">
+                <span class="hsl-val" id="lightVal">0%</span>
+            </div>
+            <div class="hsl-preview">
+                <div class="hsl-preview-box" id="hslPreview"></div>
+                <span class="hsl-hex" id="hslHex">#000000</span>
+            </div>
+            <div style="margin-top:8px;">
+                <button id="transparentBgBtn" class="mode-btn" style="width:100%;">透明背景（仅人物）</button>
+            </div>
+        </div>
+        <div class="bg-section">
+            <label>背景图片</label>
+            <div class="bg-image-row">
+                <input type="file" id="bgImageInput" accept="image/*">
+                <button id="clearBgImage">清除图片</button>
+            </div>
+            <button id="useLastBgBtn" class="mode-btn" style="width:100%; margin-top:8px;">使用上次背景</button>
+            <div class="bg-hint">提示：长按 B 键的同时，可用鼠标左键拖拽移动背景图，滚轮缩放背景图。</div>
+        </div>
+        <div class="file-actions">
+            <button class="btn-cancel" id="closeBgPanelBtn">关闭</button>
+        </div>
+    </div>
+
+    <!-- 拍摄/录制面板 -->
+    <div class="bg-panel hidden" id="capturePanel">
+        <h3>拍摄 / 录制</h3>
+        <div class="bg-section">
+            <label>模式</label>
+            <div class="capture-mode-row">
+                <button class="mode-btn active" data-mode="photo">截图</button>
+                <button class="mode-btn" data-mode="video">录制</button>
+            </div>
+        </div>
+        <div class="bg-section" id="photoSection">
+            <label>图片格式</label>
+            <select id="photoFormat">
+                <option value="image/png">PNG（无损，支持透明）</option>
+                <option value="image/jpeg">JPEG（体积小）</option>
+                <option value="image/webp">WebP（高质量压缩）</option>
+            </select>
+        </div>
+        <div class="bg-section hidden" id="videoSection">
+            <label>视频格式</label>
+            <select id="videoFormat">
+                <option value="video/mp4">MP4</option>
+                <option value="video/webm">WebM</option>
+                <option value="video/webm;codecs=vp9">WebM (VP9)</option>
+            </select>
+            <div class="bg-hint" id="videoFormatHint" style="margin-top:6px;">点击开始后将显示悬浮控制栏，可随时暂停/停止。</div>
+        </div>
+        <div class="bg-hint" id="captureHint">截图将只包含人物与背景，不含 UI 控件和鼠标光标。</div>
+        <div class="file-actions">
+            <button class="btn-cancel" id="closeCaptureBtn">取消</button>
+            <button class="btn-load" id="startCaptureBtn">开始</button>
+        </div>
+    </div>
+
+    <!-- 浮动拍摄控制栏 -->
+    <div class="capture-float hidden" id="captureFloat">
+        <div class="capture-float-inner">
+            <span class="capture-float-indicator" id="captureFloatIndicator">● 拍摄中</span>
+            <span class="capture-float-time" id="captureFloatTime">00:00</span>
+            <button class="capture-float-btn" id="captureFloatShoot" title="拍摄照片">📷 拍摄</button>
+            <button class="capture-float-btn" id="captureFloatPause" title="暂停录像">⏸ 暂停</button>
+            <button class="capture-float-btn capture-float-stop" id="captureFloatStop" title="停止并保存">⏹ 停止</button>
+        </div>
+    </div>
+
+    <!-- 控制栏（两行布局） -->
+    <div class="controls" id="controls">
+        <!-- 第一行：动作 / 表情 / 说话 -->
+        <div class="controls-row">
+            <label>动作</label>
+            <select id="actionSelect"></select>
+
+            <div class="divider"></div>
+
+            <label>表情</label>
+            <select id="expressionSelect"></select>
+
+            <div class="divider"></div>
+
+            <label>说话</label>
+            <select id="speechSelect"></select>
+        </div>
+
+        <!-- 第二行：重置视图 / 播放 / 循环 / 速度 -->
+        <div class="controls-row">
+            <button id="resetViewBtn" title="重置视图">重置视图</button>
+
+            <div class="divider"></div>
+
+            <button id="playBtn">播放</button>
+            <button id="loopBtn" title="循环播放">循环</button>
+
+            <div class="divider"></div>
+
+            <label>速度</label>
+            <input id="speedSlider" type="range" min="0" max="3" step="0.05" value="1">
+            <span class="val" id="speedText">1.00x</span>
+        </div>
+    </div>
+
+    <!-- ===== Live2D 运行时库（本地文件，离线可用） ===== -->
+    <!-- 加载顺序：PixiJS → Cubism 4 Core → pixi-live2d-display（cubism4 构建） -->
+    <!-- 全局变量：window.PIXI / window.Live2DCubismCore / window.PIXI.live2d.Live2DModel -->
+    <script src="lib/pixi.min.js"></script>
+    <script src="lib/live2dcubismcore.min.js"></script>
+    <script src="lib/pixi-live2d-display.cubism4.min.js"></script>
+
+    <!-- 主逻辑入口（ES Module，按业务模块拆分） -->
+    <script type="module" src="src/main.js"></script>
+</body>
+</html>

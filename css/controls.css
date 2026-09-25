@@ -1,0 +1,126 @@
+/* ============================================================
+ * controls.css
+ * 控制栏样式：底部两行控制栏、左上角提示、右上角功能按钮
+ * ============================================================ */
+
+/* ===== 浮层控制栏 ===== */
+.controls {
+    position: fixed;
+    left: 50%;
+    bottom: 18px;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 16px;
+    background: rgba(20, 20, 20, 0.72);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.45);
+    z-index: 10;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    max-width: 98vw;
+    width: fit-content;
+}
+.controls.hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(-50%) translateY(20px);
+}
+.controls-row {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 10px;
+    justify-content: center;
+    white-space: nowrap;
+}
+.controls label {
+    font-size: 13px;
+    color: #ccc;
+    white-space: nowrap;
+}
+.controls select,
+.controls button,
+.controls input[type="range"] {
+    background: rgba(255,255,255,0.08);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 13px;
+    outline: none;
+}
+.controls select:focus,
+.controls button:focus {
+    border-color: rgba(120,180,255,0.6);
+}
+.controls select option {
+    background: #1e1e1e;
+    color: #fff;
+}
+.controls select option:checked {
+    background: #2d6cdf;
+    color: #fff;
+}
+.controls button {
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.controls button:hover {
+    background: rgba(255,255,255,0.18);
+}
+.controls button.active {
+    background: #2d6cdf;
+    border-color: #5a8ef0;
+}
+.controls input[type="range"] {
+    width: 110px;
+    padding: 0;
+    accent-color: #6ea8ff;
+}
+.controls .val {
+    font-size: 12px;
+    color: #9ec5ff;
+    min-width: 32px;
+    text-align: right;
+}
+.controls .divider {
+    width: 1px;
+    height: 22px;
+    background: rgba(255,255,255,0.15);
+    margin: 0 2px;
+}
+
+/* ===== 左上角信息 / 右上角按钮 ===== */
+.top-left {
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    font-size: 12px;
+    color: rgba(255,255,255,0.6);
+    z-index: 10;
+    line-height: 1.8;
+    transition: opacity 0.25s ease;
+}
+.top-right {
+    position: fixed;
+    top: 14px;
+    right: 14px;
+    display: flex;
+    gap: 8px;
+    z-index: 10;
+}
+.top-right button {
+    background: rgba(20,20,20,0.6);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+}
+.top-right button:hover { background: rgba(255,255,255,0.16); }

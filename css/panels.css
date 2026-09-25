@@ -1,0 +1,233 @@
+/* ============================================================
+ * panels.css
+ * 面板样式：文件选择面板、背景设置面板、拍摄面板、HSL 滑块
+ * ============================================================ */
+
+/* ===== 文件选择面板 / 背景设置面板 ===== */
+.file-panel, .bg-panel {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 420px;
+    max-width: 92vw;
+    background: rgba(28, 28, 32, 0.95);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 14px;
+    padding: 22px 24px;
+    z-index: 50;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+}
+.file-panel.hidden, .bg-panel.hidden { display: none; }
+.file-panel h3, .bg-panel h3 {
+    margin: 0 0 16px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+}
+.file-row {
+    margin-bottom: 14px;
+}
+.file-row label {
+    display: block;
+    font-size: 13px;
+    color: #aaa;
+    margin-bottom: 6px;
+}
+.file-row input[type="file"] {
+    width: 100%;
+    color: #ccc;
+    font-size: 12px;
+}
+.file-input-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.file-input-row input[type="file"] {
+    flex: 1;
+    min-width: 0;
+}
+.file-clear-btn {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.1);
+    color: #ccc;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+}
+.file-clear-btn:hover { background: rgba(220, 80, 80, 0.6); color: #fff; }
+.file-row .file-name {
+    display: block;
+    margin-top: 4px;
+    font-size: 11px;
+    color: #6ea8ff;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.file-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 18px;
+}
+.file-actions button {
+    flex: 1;
+    padding: 8px 0;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.btn-load {
+    background: #2d6cdf;
+    color: #fff;
+}
+.btn-load:hover { background: #3d7cef; }
+.btn-cancel {
+    background: rgba(255,255,255,0.1);
+    color: #ccc;
+}
+.btn-cancel:hover { background: rgba(255,255,255,0.18); }
+
+/* 背景设置面板专用样式 */
+.bg-section {
+    margin-bottom: 18px;
+}
+.bg-section > label {
+    display: block;
+    font-size: 13px;
+    color: #aaa;
+    margin-bottom: 10px;
+}
+.hsl-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+.hsl-label {
+    font-size: 12px;
+    color: #ccc;
+    min-width: 42px;
+}
+.hsl-row input[type="range"] {
+    flex: 1;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: rgba(255,255,255,0.12);
+    border-radius: 3px;
+    outline: none;
+}
+.hsl-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #6ea8ff;
+    border: 2px solid #fff;
+    cursor: pointer;
+}
+.hsl-row input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #6ea8ff;
+    border: 2px solid #fff;
+    cursor: pointer;
+}
+.hsl-val {
+    font-size: 12px;
+    color: #9ec5ff;
+    min-width: 40px;
+    text-align: right;
+}
+.hsl-preview {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 14px;
+}
+.hsl-preview-box {
+    width: 48px;
+    height: 32px;
+    border-radius: 6px;
+    border: 2px solid rgba(255,255,255,0.25);
+    background: #000;
+}
+.hsl-hex {
+    font-size: 13px;
+    color: #ccc;
+    font-family: monospace;
+}
+.capture-mode-row {
+    display: flex;
+    gap: 10px;
+}
+.mode-btn {
+    flex: 1;
+    padding: 8px 0;
+    background: rgba(255,255,255,0.08);
+    color: #ccc;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background 0.15s;
+}
+.mode-btn:hover { background: rgba(255,255,255,0.18); }
+.mode-btn.active {
+    background: #2d6cdf;
+    border-color: #5a8ef0;
+    color: #fff;
+}
+.capture-panel select {
+    width: 100%;
+    background: rgba(255,255,255,0.08);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 13px;
+    outline: none;
+}
+.bg-image-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.bg-image-row input[type="file"] {
+    color: #ccc;
+    font-size: 12px;
+    flex: 1;
+    min-width: 160px;
+}
+.bg-image-row button {
+    padding: 6px 12px;
+    background: rgba(255,255,255,0.1);
+    color: #ccc;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    white-space: nowrap;
+}
+.bg-image-row button:hover { background: rgba(255,255,255,0.18); }
+.bg-hint {
+    font-size: 11px;
+    color: #888;
+    margin-top: 8px;
+    line-height: 1.5;
+}

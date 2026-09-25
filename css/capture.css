@@ -1,0 +1,66 @@
+/* ============================================================
+ * capture.css
+ * 拍摄悬浮控制栏样式：录制指示器、计时器、拍摄/暂停/停止按钮
+ * ============================================================ */
+
+/* 浮动拍摄控制栏 */
+.capture-float {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    background: rgba(20, 20, 20, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 12px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.5);
+    padding: 8px 14px;
+    user-select: none;
+}
+.capture-float.dragging { cursor: grabbing; }
+.capture-float.hidden { display: none; }
+.capture-float-inner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: grab;
+}
+.capture-float-inner:active { cursor: grabbing; }
+.capture-float-indicator {
+    color: #ff5a5a;
+    font-size: 13px;
+    font-weight: bold;
+    animation: blink 1s infinite;
+}
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+.capture-float-time {
+    color: #fff;
+    font-size: 14px;
+    font-family: monospace;
+    min-width: 50px;
+    text-align: center;
+}
+.capture-float-btn {
+    background: rgba(255,255,255,0.12);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
+}
+.capture-float-btn:hover { background: rgba(255,255,255,0.25); }
+.capture-float-btn:active { transform: scale(0.96); }
+.capture-float-stop {
+    background: rgba(220, 60, 60, 0.8);
+    border-color: rgba(255,100,100,0.5);
+}
+.capture-float-stop:hover { background: rgba(220, 60, 60, 1); }
+.capture-float-btn.photo-only { display: none; }
