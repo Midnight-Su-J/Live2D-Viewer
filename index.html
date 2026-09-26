@@ -25,6 +25,9 @@
     <!-- B 键背景操控模式提示 -->
     <div class="bg-mode-indicator" id="bgModeIndicator">背景操控模式（长按 B）</div>
 
+    <!-- 眼球跟随光标模式提示 -->
+    <div class="eye-follow-indicator" id="eyeFollowIndicator">眼球跟随光标（右键切换）</div>
+
     <!-- 加载中遮罩 / 错误提示 -->
     <div class="loading" id="loading">加载 Live2D 资源中…</div>
     <div class="error-tip" id="errorTip"></div>
@@ -35,13 +38,14 @@
     <!-- 左上角操作提示 -->
     <div class="top-left" id="hint">
         左键拖拽：移动人物 &nbsp;|&nbsp; 滚轮：缩放 &nbsp;|&nbsp; 双击：重置视图 &nbsp;|&nbsp; H：显示/隐藏控件<br>
-        长按 B：拖拽移动背景图 / 滚轮缩放背景图
+        长按 B：拖拽移动背景图 / 滚轮缩放背景图 &nbsp;|&nbsp; 右键：切换眼球跟随光标
     </div>
 
     <!-- 右上角功能按钮 -->
     <div class="top-right">
         <button id="openFileBtn" title="选择本地 Live2D 模型文件夹">打开文件夹</button>
         <button id="bgBtn" title="背景设置">背景</button>
+        <button id="paramsBtn" title="调节模型参数">参数</button>
         <button id="captureBtn" title="拍摄 / 录制">拍摄</button>
         <button id="fsBtn" title="全屏">全屏</button>
     </div>
@@ -152,6 +156,18 @@
             <button class="capture-float-btn" id="captureFloatPause" title="暂停录像">⏸ 暂停</button>
             <button class="capture-float-btn capture-float-stop" id="captureFloatStop" title="停止并保存">⏹ 停止</button>
         </div>
+    </div>
+
+    <!-- 参数调节下拉面板 -->
+    <div class="params-panel hidden" id="paramsPanel">
+        <div class="params-panel-header">
+            <h3>模型参数</h3>
+            <div class="params-panel-actions">
+                <input type="text" id="paramsSearch" placeholder="搜索参数…" class="params-search">
+                <button class="params-reset-btn" id="paramsResetAllBtn" title="全部恢复默认">重置</button>
+            </div>
+        </div>
+        <div class="params-list" id="paramsList"></div>
     </div>
 
     <!-- 控制栏（两行布局） -->

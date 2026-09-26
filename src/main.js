@@ -26,6 +26,7 @@ import { setupBackground } from './background.js';
 import { setupCapture } from './capture.js';
 import { setupInteraction, setupTouch } from './interaction.js';
 import { setupUI } from './ui.js';
+import { setupParams } from './params.js';
 
 // ===== 修复 PixiJS url.resolve 对 blob URL 的破坏 =====
 // PixiJS 的 url.resolve 在 base 为 blob URL 时会破坏第二个 URL（丢失冒号），
@@ -113,7 +114,15 @@ const dom = {
     bgImageInput: document.getElementById('bgImageInput'),
     clearBgImage: document.getElementById('clearBgImage'),
     closeBgPanelBtn: document.getElementById('closeBgPanelBtn'),
-    useLastBgBtn: document.getElementById('useLastBgBtn')
+    useLastBgBtn: document.getElementById('useLastBgBtn'),
+    // 参数调节面板
+    paramsBtn: document.getElementById('paramsBtn'),
+    paramsPanel: document.getElementById('paramsPanel'),
+    paramsList: document.getElementById('paramsList'),
+    paramsSearch: document.getElementById('paramsSearch'),
+    paramsResetAllBtn: document.getElementById('paramsResetAllBtn'),
+    // 眼球跟随指示器
+    eyeFollowIndicator: document.getElementById('eyeFollowIndicator')
 };
 
 // ===== 全局共享状态 =====
@@ -155,6 +164,14 @@ const state = {
     // --- 悬浮栏拖动 ---
     isFloatDragging: false,
     floatDragOffsetX: 0, floatDragOffsetY: 0,
+    // --- 眼球跟随光标 ---
+    eyeFollow: false,
+    eyeMouseX: 0, eyeMouseY: 0,
+    // --- 参数面板覆盖值（paramId -> value），拖动中生效 ---
+    paramOverrides: {},
+    // --- 持久参数值（paramId -> value），松开后保持，每帧重新应用 ---
+    //     若参数被当前动作控制，会在 ticker 中自动检测并移除，恢复动作轨迹
+    persistentParams: {},
     // --- 资源管理 ---
     lastBlobUrls: []
 };
@@ -167,6 +184,11 @@ state.bgUpdate = setupBackground(state, dom);
 setupAnimation(state, dom);
 setupCapture(state, dom);
 setupInteraction(state, dom);
+const params = setupParams(state, dom);
+// 模型原始 JSON（用于参数中文名查找等），在 createPlayer 中赋值
+state.modelJson = null;
+// 从 .cdi3.json 提取的参数 ID → 中文名 映射，在 createPlayer 中赋值
+state.cdiNameMap = {};
 
 // ===== 从模型 JSON 中提取可播放条目（按文件名前缀分类） =====
 // 规则：b_ → 动作，e_ → 表情，t_ → 说话；无前缀默认归入动作
@@ -231,7 +253,8 @@ function fillSelect(selectEl, items, placeholder) {
 // ===== 创建 PixiJS 应用并加载 Live2D 模型 =====
 // modelJsonUrl：改写后的模型 JSON blob URL
 // originalJson：原始模型 JSON，用于提取动作/表情列表
-function createPlayer(modelJsonUrl, originalJson) {
+// cdiNameMap：从 .cdi3.json 提取的参数 ID → 中文名 映射
+function createPlayer(modelJsonUrl, originalJson, cdiNameMap) {
     // 1. 销毁旧应用并释放资源
     disposeApp(state.app);
     state.app = null;
@@ -249,6 +272,9 @@ function createPlayer(modelJsonUrl, originalJson) {
     state.actionItems = [];
     state.expressionItems = [];
     state.speechItems = [];
+    state.paramOverrides = {};
+    state.eyeFollow = false;
+    dom.eyeFollowIndicator.classList.remove('show');
     dom.actionSelect.innerHTML = '';
     dom.expressionSelect.innerHTML = '';
     dom.speechSelect.innerHTML = '';
@@ -298,7 +324,72 @@ function createPlayer(modelJsonUrl, originalJson) {
 
         app.ticker.add(() => {
             if (!state.model) return;
-            state.model.update(app.ticker.deltaMS);
+            const im = state.model.internalModel;
+            if (!im) return;
+            const cm = im.coreModel;
+            if (!cm) return;
+
+            // 1. 眼球跟随光标：设置 focusController 目标
+            //    屏幕 y 向下为正，模型 ParamEyeBallY/ParamAngleY 正值代表向上看，故 Y 轴取反
+            if (state.eyeFollow && Number.isFinite(state.eyeMouseX)) {
+                try {
+                    const sw = state.app.screen.width;
+                    const sh = state.app.screen.height;
+                    const nx = Math.max(-1, Math.min(1, (state.eyeMouseX - sw / 2) / (sw / 2)));
+                    const ny = Math.max(-1, Math.min(1, (state.eyeMouseY - sh / 2) / (sh / 2)));
+                    if (im.focusController) im.focusController.focus(nx, -ny);
+                } catch (e) { /* 忽略 */ }
+            }
+
+            // 2. 手动编排模型更新流程
+            //    internalModel.update 内部顺序：
+            //      motion.update → saveParameters → expression/blink/focus/breath/physics/pose
+            //      → coreModel.update → loadParameters
+            //    问题：loadParameters 会清除 focus/physics 等临时累加值。
+            //    若在 update 之后再 applyOverrides + coreModel.update，眼球偏移和物理都会丢失。
+            //    解决：在 motion.update 之后、saveParameters 之前插入 applyOverrides，
+            //    让覆盖值被 saveParameters 保存，loadParameters 时不被清除。
+            //    - 动画参数：动作从拖动值插值回目标，实现"恢复轨迹"
+            //    - 静止参数：覆盖值被保存持久化
+            const dt = app.ticker.deltaMS;
+            state.model.elapsedTime += dt;
+            const tSec = dt / 1000;
+            const eSec = state.model.elapsedTime / 1000;
+
+            // 2a. focusController 平滑插值（对应 pe.update）
+            try { im.focusController && im.focusController.update(dt); } catch (e) {}
+
+            // 2b. 动作更新
+            im.emit('beforeMotionUpdate');
+            const motionUpdated = im.motionManager.update(cm, eSec);
+            im.emit('afterMotionUpdate');
+
+            // 2c. 【关键】在 saveParameters 之前应用用户覆盖，使覆盖值被保存
+            //     motionManager.update 内部 loadParameters 会恢复到动作起始状态，
+            //     重置非动作参数，因此必须在此之后重新应用持久值
+            params.applyOverrides();
+
+            // 2d. 保存当前参数（含覆盖值），供 loadParameters 恢复
+            cm.saveParameters();
+
+            // 2e. 表情 / 眨眼 / 眼球跟随 / 呼吸 / 物理 / 姿势
+            try { im.motionManager.expressionManager && im.motionManager.expressionManager.update(cm, eSec); } catch (e) {}
+            try { !motionUpdated && im.eyeBlink && im.eyeBlink.updateParameters(cm, tSec); } catch (e) {}
+            try { im.updateFocus(); } catch (e) {}
+            try { im.updateNaturalMovements(dt, state.model.elapsedTime); } catch (e) {}
+            try { im.physics && im.physics.evaluate(cm, tSec); } catch (e) {}
+            try { im.pose && im.pose.updateParameters(cm, tSec); } catch (e) {}
+
+            // 2f. 应用到网格
+            im.emit('beforeModelUpdate');
+            cm.update();
+            cm.loadParameters();
+
+            // 防止 _render 再次调用 internalModel.update
+            state.model.deltaTime = 0;
+
+            // 3. 同步滑块 UI
+            params.syncSliders();
         });
 
         // 初始适配视口（含锚点、缩放、定位）
@@ -307,6 +398,8 @@ function createPlayer(modelJsonUrl, originalJson) {
         // 解析模型 JSON 中的动作/表情条目并填充下拉框
         // 直接使用传入的原始模型 JSON，不依赖库内部 settings 结构
         const items = extractSelectableItems(originalJson || {});
+        state.modelJson = originalJson || {};
+        state.cdiNameMap = cdiNameMap || {};
         state.actionItems = items.action;
         state.expressionItems = items.expression;
         state.speechItems = items.speech;
@@ -314,6 +407,13 @@ function createPlayer(modelJsonUrl, originalJson) {
         fillSelect(dom.actionSelect, items.action, '无动作');
         fillSelect(dom.expressionSelect, items.expression, '无表情');
         fillSelect(dom.speechSelect, items.speech, '无说话');
+
+        // 构建模型参数调节面板（失败不影响模型正常加载）
+        try {
+            params.buildParams();
+        } catch (e) {
+            console.warn('[Live2D] 参数面板构建失败：', e);
+        }
 
         // 默认播放 idle 动作（若存在），并停在首帧
         const idleItem = items.action.find(it => /idle/i.test(it.name));
@@ -449,6 +549,36 @@ async function loadLocalFiles() {
         const originalJson = JSON.parse(JSON.stringify(modelJson));
         rewritePaths(modelJson, urlMap);
 
+        // 6.5 加载 display info (.cdi3.json) 中的参数中文名
+        // 优先用 model3.json FileReferences.DisplayInfo 引用的路径；
+        // 若未引用，则按命名约定（<模型基名>.cdi3.json）在文件夹中查找。
+        let cdiNameMap = {};
+        try {
+            let cdiBlobUrl = null;
+            const displayInfoPath = modelJson.FileReferences && modelJson.FileReferences.DisplayInfo;
+            if (displayInfoPath) {
+                cdiBlobUrl = urlMap[displayInfoPath.replace(/\\/g, '/')];
+            }
+            if (!cdiBlobUrl) {
+                const baseName = modelFile.name.replace(/\.model3?\.json$/i, '');
+                const cdiFile = files.find(f =>
+                    f.name.toLowerCase() === (baseName + '.cdi3.json').toLowerCase()
+                );
+                if (cdiFile) cdiBlobUrl = URL.createObjectURL(cdiFile);
+            }
+            if (cdiBlobUrl) {
+                const cdiText = await fetch(cdiBlobUrl).then(r => r.text());
+                const cdiJson = JSON.parse(cdiText);
+                if (Array.isArray(cdiJson.Parameters)) {
+                    cdiJson.Parameters.forEach(p => {
+                        if (p && p.Id && p.Name) cdiNameMap[p.Id] = p.Name;
+                    });
+                }
+            }
+        } catch (e) {
+            console.warn('[Live2D] 加载参数显示信息(.cdi3.json)失败：', e);
+        }
+
         // 7. 把改写后的模型 JSON 生成为 blob URL
         const rewrittenJsonBlob = new Blob([JSON.stringify(modelJson)], { type: 'application/json' });
         const modelJsonUrl = URL.createObjectURL(rewrittenJsonBlob);
@@ -456,7 +586,7 @@ async function loadLocalFiles() {
         state.lastBlobUrls = createdUrls;
 
         // 8. 加载模型
-        createPlayer(modelJsonUrl, originalJson);
+        createPlayer(modelJsonUrl, originalJson, cdiNameMap);
 
     } catch (e) {
         ui.showError('加载本地文件夹失败：' + (e.message || e));
@@ -480,6 +610,9 @@ function disposeCurrentModel() {
     state.actionItems = [];
     state.expressionItems = [];
     state.speechItems = [];
+    state.paramOverrides = {};
+    state.eyeFollow = false;
+    dom.eyeFollowIndicator.classList.remove('show');
     dom.actionSelect.innerHTML = '';
     dom.expressionSelect.innerHTML = '';
     dom.speechSelect.innerHTML = '';

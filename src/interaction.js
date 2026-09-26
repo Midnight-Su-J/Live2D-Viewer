@@ -107,6 +107,25 @@ export function setupInteraction(state, dom) {
 
     // ===== 拖拽：使用 pointerdown + pointercapture，绑定到 canvas，避免事件被拦截 =====
     function onPointerDown(e) {
+        // 右键：切换眼球跟随光标模式
+        if (e.button === 2) {
+            state.eyeFollow = !state.eyeFollow;
+            dom.eyeFollowIndicator.classList.toggle('show', state.eyeFollow);
+            // 关闭跟随时把注视点复位到中心（直接清零 focusController，
+            // 避免 model.focus 在中心点 atan2(0,0) 角度未定义导致无法复位）
+            if (!state.eyeFollow && state.model) {
+                try {
+                    const fc = state.model.internalModel.focusController;
+                    if (fc) {
+                        fc.focus(0, 0, true);
+                        fc.x = 0; fc.y = 0;
+                        fc.targetX = 0; fc.targetY = 0;
+                        fc.vx = 0; fc.vy = 0;
+                    }
+                } catch (err) {}
+            }
+            return;
+        }
         if (e.button !== 0) return;
         const canvas = getCanvas();
         // 长按 B 时拖拽背景图
@@ -129,6 +148,42 @@ export function setupInteraction(state, dom) {
     }
 
     function onPointerMove(e) {
+        // 始终记录鼠标位置，供眼球跟随使用（canvas 铺满视口，clientX/Y 即画布坐标）
+        state.eyeMouseX = e.clientX;
+        state.eyeMouseY = e.clientY;
+
+        // 暂停状态下眼球跟随：设置注视点并手动推进一帧（屏幕 y 向下，模型 y 向上，故 Y 轴取反）
+        if (state.eyeFollow && !state.playing && state.model && state.model.internalModel) {
+            try {
+                const sw = state.app.screen.width;
+                const sh = state.app.screen.height;
+                const nx = Math.max(-1, Math.min(1, (e.clientX - sw / 2) / (sw / 2)));
+                const ny = Math.max(-1, Math.min(1, (e.clientY - sh / 2) / (sh / 2)));
+                const fc = state.model.internalModel.focusController;
+                if (fc) fc.focus(nx, -ny, true);
+
+                const im = state.model.internalModel;
+                const cm = im.coreModel;
+                const dt = 0, tSec = 0, eSec = state.model.elapsedTime / 1000;
+                try { im.focusController && im.focusController.update(dt); } catch (err) {}
+                im.emit('beforeMotionUpdate');
+                const motionUpdated = im.motionManager.update(cm, eSec);
+                im.emit('afterMotionUpdate');
+                cm.saveParameters();
+                try { im.motionManager.expressionManager && im.motionManager.expressionManager.update(cm, eSec); } catch (err) {}
+                try { !motionUpdated && im.eyeBlink && im.eyeBlink.updateParameters(cm, tSec); } catch (err) {}
+                try { im.updateFocus(); } catch (err) {}
+                try { im.updateNaturalMovements(dt, state.model.elapsedTime); } catch (err) {}
+                try { im.physics && im.physics.evaluate(cm, tSec); } catch (err) {}
+                try { im.pose && im.pose.updateParameters(cm, tSec); } catch (err) {}
+                im.emit('beforeModelUpdate');
+                cm.update();
+                cm.loadParameters();
+                state.model.deltaTime = 0;
+                state.app && state.app.render();
+            } catch (err) {}
+        }
+
         if (state.isBgPanning) {
             const dx = e.clientX - state.bgPanLastX;
             const dy = e.clientY - state.bgPanLastY;
@@ -170,6 +225,8 @@ export function setupInteraction(state, dom) {
         el.addEventListener('pointermove', onPointerMove);
         el.addEventListener('pointerup', onPointerUp);
         el.addEventListener('pointercancel', onPointerUp);
+        // 阻止右键默认菜单，让右键用于切换眼球跟随
+        el.addEventListener('contextmenu', (e) => e.preventDefault());
         if (canvas) {
             canvas.style.touchAction = 'none';
             canvas.style.cursor = 'grab';
